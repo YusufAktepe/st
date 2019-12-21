@@ -2,7 +2,7 @@
 
 _name=st
 pkgname=${_name}-git
-pkgver=0.8.2.r1091.849b259
+pkgver=0.8.2.r1091.0d1cde2
 pkgrel=1
 pkgdesc='Simple virtual terminal emulator for X'
 url='https://github.com/yusufaktepe/st'
@@ -10,7 +10,7 @@ arch=('i686' 'x86_64')
 license=('MIT')
 options=('zipman')
 depends=('libxft')
-makedepends=('git' 'libxext' 'ncurses' 'xorgproto')
+makedepends=('git' 'libxext' 'ncurses')
 optdepends=('dmenu: feed urls to dmenu')
 source=("${_name}::git+${url}.git")
 sha1sums=('SKIP')
