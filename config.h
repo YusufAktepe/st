@@ -101,36 +101,34 @@ char *termname = "st-256color";
 unsigned int tabspaces = 8;
 
 /* bg opacity */
-float alpha = 0.8;
+float alpha = 0.92;
 
 /* Terminal colors (16 first used in escape sequence) */
 static const char *colorname[] = {
-	/* 8 normal colors */
-	"black",
-	"red3",
-	"green3",
-	"yellow3",
-	"blue2",
-	"magenta3",
-	"cyan3",
-	"gray90",
-
-	/* 8 bright colors */
-	"gray50",
-	"red",
-	"green",
-	"yellow",
-	"#5c5cff",
-	"magenta",
-	"cyan",
-	"white",
+	"#1d2021", /* def: #282828 / hard contrast: #1d2021 / soft contrast: #32302f */
+	"#cc241d",
+	"#98971a",
+	"#d79921",
+	"#458588",
+	"#b16286",
+	"#689d6a",
+	"#a89984",
+	"#928374",
+	"#fb4934",
+	"#b8bb26",
+	"#fabd2f",
+	"#83a598",
+	"#d3869b",
+	"#8ec07c",
+	"#ebdbb2",
 
 	[255] = 0,
 
 	/* more colors can be added after 255 to use with DefaultXX */
-	"#cccccc",
-	"#555555",
-	"black",
+	"#add8e6", /* 256: cursor */
+	"#000000", /* 257: rev cursor */
+	"#1d2021", /* 258: bg */
+	"#ebdbb2", /* 259: fg */
 };
 
 
@@ -138,7 +136,7 @@ static const char *colorname[] = {
  * Default colors (colorname index)
  * foreground, background, cursor, reverse cursor
  */
-unsigned int defaultfg = 7;
+unsigned int defaultfg = 259;
 unsigned int defaultbg = 258;
 static unsigned int defaultcs = 256;
 static unsigned int defaultrcs = 257;
@@ -185,6 +183,12 @@ static uint forcemousemod = ShiftMask;
 char *iso14755_cmd = "dmenu -w \"$WINDOWID\" -p codepoint: </dev/null";
 
 /*
+ * External-Pipe commands.
+ */
+static char *openurlcmd[] = { "/bin/sh", "-c", "st-urlhandler", "externalpipe", NULL };
+static char *copyurlcmd[] = { "/bin/sh", "-c", "st-urlhandler copy", "externalpipe", NULL };
+
+/*
  * Internal mouse shortcuts.
  * Beware that overloading Button1 will disable the selection.
  */
@@ -193,6 +197,7 @@ static MouseShortcut mshortcuts[] = {
 	{ XK_ANY_MOD,           Button4, kscrollup,      {.i = 1},      0, /* !alt */ -1 },
 	{ XK_ANY_MOD,           Button5, kscrolldown,    {.i = 1},      0, /* !alt */ -1 },
 	{ XK_ANY_MOD,           Button2, selpaste,       {.i = 0},      1 },
+	{ XK_ANY_MOD,           Button3, clippaste,      {.i = 0},      1 },
 	{ XK_ANY_MOD,           Button4, ttysend,        {.s = "\031"} },
 	{ XK_ANY_MOD,           Button5, ttysend,        {.s = "\005"} },
 };
@@ -202,22 +207,36 @@ static MouseShortcut mshortcuts[] = {
 #define TERMMOD (ControlMask|ShiftMask)
 
 static Shortcut shortcuts[] = {
-	/* mask                 keysym          function        argument */
-	{ XK_ANY_MOD,           XK_Break,       sendbreak,      {.i =  0} },
-	{ ControlMask,          XK_Print,       toggleprinter,  {.i =  0} },
-	{ ShiftMask,            XK_Print,       printscreen,    {.i =  0} },
-	{ XK_ANY_MOD,           XK_Print,       printsel,       {.i =  0} },
-	{ TERMMOD,              XK_Prior,       zoom,           {.f = +1} },
-	{ TERMMOD,              XK_Next,        zoom,           {.f = -1} },
-	{ TERMMOD,              XK_Home,        zoomreset,      {.f =  0} },
-	{ TERMMOD,              XK_C,           clipcopy,       {.i =  0} },
-	{ TERMMOD,              XK_V,           clippaste,      {.i =  0} },
-	{ TERMMOD,              XK_Y,           selpaste,       {.i =  0} },
-	{ ShiftMask,            XK_Insert,      selpaste,       {.i =  0} },
-	{ TERMMOD,              XK_Num_Lock,    numlock,        {.i =  0} },
-	{ ShiftMask,            XK_Page_Up,     kscrollup,      {.i = -1} },
-	{ ShiftMask,            XK_Page_Down,   kscrolldown,    {.i = -1} },
-	{ TERMMOD,              XK_I,           iso14755,       {.i =  0} },
+	/* mask           keysym          function        argument */
+	{ XK_ANY_MOD,     XK_Break,       sendbreak,      {.i =  0} },
+	{ ControlMask,    XK_Print,       toggleprinter,  {.i =  0} },
+	{ ShiftMask,      XK_Print,       printscreen,    {.i =  0} },
+	{ XK_ANY_MOD,     XK_Print,       printsel,       {.i =  0} },
+	{ TERMMOD,        XK_Num_Lock,    numlock,        {.i =  0} },
+
+	{ ShiftMask,      XK_Insert,      selpaste,       {.i =  0} },
+	{ TERMMOD,        XK_C,           clipcopy,       {.i =  0} },
+	{ TERMMOD,        XK_V,           clippaste,      {.i =  0} },
+
+	{ ShiftMask,      XK_Page_Up,     kscrollup,      {.i = -1} },
+	{ ShiftMask,      XK_Page_Down,   kscrolldown,    {.i = -1} },
+	{ TERMMOD,        XK_K,           kscrollup,      {.i =  1} },
+	{ TERMMOD,        XK_J,           kscrolldown,    {.i =  1} },
+	{ TERMMOD,        XK_Up,          kscrollup,      {.i =  1} },
+	{ TERMMOD,        XK_Down,        kscrolldown,    {.i =  1} },
+	{ TERMMOD,        XK_Page_Up,     kscrollup,      {.i =  10} },
+	{ TERMMOD,        XK_Page_Down,   kscrolldown,    {.i =  10} },
+
+	{ ControlMask,    XK_0,           zoomreset,      {.f =  0} },
+	{ ControlMask,    XK_KP_0,        zoomreset,      {.f =  0} },
+	{ ControlMask,    XK_plus,        zoom,           {.f = +1} },
+	{ ControlMask,    XK_KP_Add,      zoom,           {.f = +1} },
+	{ ControlMask,    XK_minus,       zoom,           {.f = -1} },
+	{ ControlMask,    XK_KP_Subtract, zoom,           {.f = -1} },
+
+	{ TERMMOD,        XK_I,           iso14755,       {.i =  0} },
+	{ TERMMOD,        XK_L,           externalpipe,   {.v = openurlcmd } },
+	{ TERMMOD,        XK_Y,           externalpipe,   {.v = copyurlcmd } },
 };
 
 /*
